@@ -195,11 +195,32 @@
             </div>
         </footer>
 
+        <!-- Add Custom Scent Modal -->
+        <div id="add-scent-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity">
+            <div class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2rem] p-6 sm:p-8 w-full max-w-md shadow-2xl relative">
+                <h3 class="text-2xl font-bold mb-2">Add New Fragrance</h3>
+                <p class="text-sm text-body mb-6">Create a custom scent for your personal library.</p>
+                <form id="add-scent-form" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Brand</label><input required type="text" id="new-brand" class="w-full bg-stone-100 dark:bg-black border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all" placeholder="e.g. Diptyque"></div>
+                        <div><label class="block text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Name</label><input required type="text" id="new-name" class="w-full bg-stone-100 dark:bg-black border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all" placeholder="e.g. Baies"></div>
+                    </div>
+                    <div><label class="block text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Primary Top Note</label><input required type="text" id="new-top" class="w-full bg-stone-100 dark:bg-black border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all" placeholder="e.g. Blackcurrant Leaves"></div>
+                    <div><label class="block text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Primary Heart Note</label><input required type="text" id="new-heart" class="w-full bg-stone-100 dark:bg-black border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all" placeholder="e.g. Bulgarian Rose"></div>
+                    <div><label class="block text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Primary Base Note</label><input required type="text" id="new-base" class="w-full bg-stone-100 dark:bg-black border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all" placeholder="e.g. Ambergris"></div>
+                    <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-stone-100 dark:border-stone-800">
+                        <button type="button" onclick="closeAddModal()" class="px-5 py-3 rounded-xl font-bold text-sm text-stone-500 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors">Cancel</button>
+                        <button type="submit" class="px-6 py-3 rounded-xl font-bold text-sm bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-lg hover:scale-[1.02] transition-transform">Add to Library</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </div>
 
     <script>
         // --- 1. DATA DICTIONARIES ---
-        const database = [
+        let database = [
             { id: 1, brand: "Aesop", name: "Tacit", top: ["Yuzu", "Basil"], heart: ["Rosemary", "Fennel"], base: ["Vetiver", "Cedar"] },
             { id: 2, brand: "Aesop", name: "Karst", top: ["Juniper", "Bergamot"], heart: ["Sage", "Cumin"], base: ["Vetiver", "Sandalwood"] },
             { id: 3, brand: "Aesop", name: "Erémia", top: ["Yuzu", "Grapefruit"], heart: ["Galbanum", "Iris"], base: ["Vetiver", "Patchouli"] },
@@ -235,6 +256,14 @@
             "Vetiver": { title: "Vetiver", icon: "V", subtitle: "The Deep Root", text: "Known as the 'oil of tranquility', it acts as an emotional anchor, pulling scattered energy back to the earth." }
         };
 
+        // Load Custom Scents
+        try {
+            const customScents = JSON.parse(localStorage.getItem('custom_scents') || '[]');
+            if (customScents.length > 0) {
+                database = [...database, ...customScents];
+            }
+        } catch (e) { console.error("Error loading custom scents", e); }
+
         // --- 2. STATE & INITIALIZATION ---
         let selectedIDs = [];
         let isInitialLoad = true;
@@ -264,6 +293,16 @@
                 `;
                 gridEl.appendChild(card);
             });
+            
+            const addCard = document.createElement('div');
+            addCard.className = `selectable-card flex flex-col justify-center items-center border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl p-3 sm:p-4 text-center select-none cursor-pointer hover:border-amber-500 text-stone-400 hover:text-amber-500 transition-colors bg-transparent`;
+            addCard.onclick = () => openAddModal();
+            addCard.innerHTML = `
+                <svg class="w-8 h-8 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                <span class="font-bold text-xs uppercase tracking-widest">Add Custom</span>
+            `;
+            gridEl.appendChild(addCard);
+
             countEl.textContent = selectedIDs.length;
         }
 
@@ -448,8 +487,39 @@
         }
 
         renderGrid();
+        // --- 4. CUSTOM SCENT HANDLERS ---
+        function openAddModal() { document.getElementById('add-scent-modal').classList.remove('hidden'); }
+        function closeAddModal() { document.getElementById('add-scent-modal').classList.add('hidden'); document.getElementById('add-scent-form').reset(); }
+
+        document.getElementById('add-scent-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const brand = document.getElementById('new-brand').value.trim();
+            const name = document.getElementById('new-name').value.trim();
+            const top = document.getElementById('new-top').value.trim();
+            const heart = document.getElementById('new-heart').value.trim();
+            const base = document.getElementById('new-base').value.trim();
+            
+            const newItem = {
+                id: Date.now(),
+                brand, name,
+                top: [top], heart: [heart], base: [base]
+            };
+            
+            let customScents = JSON.parse(localStorage.getItem('custom_scents') || '[]');
+            customScents.push(newItem);
+            localStorage.setItem('custom_scents', JSON.stringify(customScents));
+            
+            database.push(newItem);
+            closeAddModal();
+            renderGrid();
+            
+            // Automatically select the newly created scent
+            if (!selectedIDs.includes(newItem.id)) {
+                toggleSelection(newItem.id);
+            }
+        });
         
-        // INITIALIZE APP WITH ALL 15 FRAGRANCES
+        // INITIALIZE APP WITH ALL FRAGRANCES
         runEngine();
     </script>
 </body>
