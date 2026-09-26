@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Master Chandler's App</title>
+    <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+    <style>
+        :root { --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .glass-panel {
+                background: rgba(24, 24, 27, 0.85);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        .animate-enter { animation: slideUpFade 0.6s var(--ease-spring) forwards; opacity: 0; transform: translateY(20px); }
+        @keyframes slideUpFade { to { opacity: 1; transform: translateY(0); } }
+        
+        .progress-bar { transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1); width: 0; }
+        
+        .selectable-card { transition: all 0.3s var(--ease-spring); cursor: pointer; border: 2px solid transparent; }
+        .selectable-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .selectable-card.selected { border-color: #f59e0b; background-color: rgba(245, 158, 11, 0.05); transform: translateY(-4px); box-shadow: 0 10px 25px rgba(245, 158, 11, 0.2); }
+        
+        .loader { border-top-color: #f59e0b; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(150,150,150,0.4); border-radius: 10px; }
+        
+        .text-body { color: #374151; }
+        @media (prefers-color-scheme: dark) { .text-body { color: #D1D5DB; } }
+    </style>
+</head>
+<body class="bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-50 min-h-screen p-3 sm:p-6 lg:p-8 selection:bg-amber-500 selection:text-white overflow-x-hidden">
+
+    <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none opacity-40 dark:opacity-20" id="bg-gradients">
+        <div class="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-amber-500 blur-[100px] transition-colors duration-1000" id="bg-1"></div>
+        <div class="absolute top-[30%] -right-[10%] w-[50%] h-[70%] rounded-full bg-orange-700 blur-[120px] transition-colors duration-1000" id="bg-2"></div>
+        <div class="absolute -bottom-[20%] left-[10%] w-[70%] h-[60%] rounded-full bg-stone-600 blur-[120px] transition-colors duration-1000" id="bg-3"></div>
+    </div>
+
+    <div class="max-w-[1200px] mx-auto relative z-10 pb-24">
+        
+        <!-- HEADER -->
+        <header class="text-center animate-enter pt-6 px-2 mb-10">
+            <div class="inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-black tracking-widest uppercase mb-4 border border-amber-300 dark:border-amber-700 shadow-sm">
+                AI Fragrance Engine
+            </div>
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-5 leading-tight">Design Your Signature</h1>
+            <p class="text-body text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">Select up to <strong>3 of your favorite fragrances</strong> below. Leave them all unselected to see the <strong>Master Aggregate Blend</strong> calculated from all 15 candles.</p>
+        </header>
+
+        <!-- SELECTION GRID -->
+        <section class="animate-enter" style="animation-delay: 0.1s;">
+            <div class="flex justify-between items-end mb-4 px-2">
+                <h2 class="text-2xl font-bold tracking-tight">The Library</h2>
+                <div class="text-sm font-bold bg-white dark:bg-stone-900 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 shadow-sm">
+                    <span id="selection-count" class="text-amber-600 dark:text-amber-400">0</span> / 3 Selected
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" id="fragrance-grid">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- LOADING STATE -->
+        <div id="loading-state" class="hidden my-20 flex flex-col items-center justify-center text-center">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-stone-200 h-16 w-16 mb-4"></div>
+            <h3 class="text-xl font-bold text-amber-600 dark:text-amber-400" id="loading-text">Deconstructing Accords...</h3>
+        </div>
+
+        <!-- DYNAMIC RESULTS CONTAINER -->
+        <div id="results-container" class="hidden space-y-8 sm:space-y-12 mt-16 animate-enter">
+            
+            <div class="flex items-center justify-center w-full my-12">
+                <div class="h-px bg-stone-300 dark:bg-stone-700 w-full max-w-xs"></div>
+                <span class="px-4 text-xs font-black uppercase tracking-widest text-stone-400 text-center" id="divider-text">Your Bespoke Profile</span>
+                <div class="h-px bg-stone-300 dark:bg-stone-700 w-full max-w-xs"></div>
+            </div>
+
+            <!-- THE FORMULA -->
+            <section class="glass-panel rounded-[2rem] p-5 sm:p-8 lg:p-12 border-2 border-amber-200 dark:border-amber-900/60 shadow-xl relative overflow-hidden">
+                <header class="text-center mb-8 sm:mb-12 relative z-10">
+                    <h2 id="res-formula-title" class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight uppercase tracking-widest mb-3 text-amber-600 dark:text-amber-500">The Formula</h2>
+                    <p id="res-formula-subtitle" class="text-body uppercase tracking-widest font-bold text-xs sm:text-sm">Mathematically derived from your selections</p>
+                </header>
+
+                <div class="mb-10 max-w-4xl mx-auto relative z-10">
+                    <div class="h-8 w-full flex rounded-full overflow-hidden shadow-inner bg-stone-200 dark:bg-stone-800" id="res-bar-container">
+                        <!-- JS injects widths -->
+                    </div>
+                    <div class="flex justify-between text-[10px] sm:text-xs uppercase font-black tracking-widest mt-4 px-1 sm:px-2">
+                        <span class="text-yellow-700 dark:text-yellow-400" id="res-top-pct">Top</span>
+                        <span class="text-orange-700 dark:text-orange-400" id="res-heart-pct">Heart</span>
+                        <span class="text-stone-800 dark:text-stone-300" id="res-base-pct">Base</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto mb-10 relative z-10">
+                    <div class="bg-white/80 dark:bg-black/60 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 text-center shadow-sm">
+                        <h4 class="font-bold text-lg text-yellow-700 dark:text-yellow-400 mb-2" id="res-top-notes">Top Notes</h4>
+                        <p class="text-sm text-body font-medium" id="res-top-desc">Provides the initial hook.</p>
+                    </div>
+                    <div class="bg-white/80 dark:bg-black/60 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 text-center shadow-sm">
+                        <h4 class="font-bold text-lg text-orange-700 dark:text-orange-400 mb-2" id="res-heart-notes">Heart Notes</h4>
+                        <p class="text-sm text-body font-medium" id="res-heart-desc">The core character of the candle.</p>
+                    </div>
+                    <div class="bg-white/80 dark:bg-black/60 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 text-center shadow-sm">
+                        <h4 class="font-bold text-lg text-stone-800 dark:text-stone-300 mb-2" id="res-base-notes">Base Notes</h4>
+                        <p class="text-sm text-body font-medium" id="res-base-desc">The lingering memory and foundation.</p>
+                    </div>
+                </div>
+                
+                <!-- Where to buy -->
+                <div class="bg-stone-100 dark:bg-stone-900/80 rounded-3xl p-6 border border-stone-200 dark:border-stone-800 shadow-sm max-w-5xl mx-auto relative z-10">
+                    <h3 class="font-black uppercase text-sm sm:text-base tracking-widest text-stone-900 dark:text-stone-300 mb-4 text-center">Where To Buy The Oils (UK)</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <a id="link-candleshack" href="#" target="_blank" class="flex items-center justify-between bg-white dark:bg-black p-4 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm hover:border-amber-500 transition-colors">
+                            <div><span class="block font-bold text-sm md:text-base">Candle Shack</span><span class="block text-xs text-body mt-1" id="link-cs-text">Search...</span></div>
+                            <svg class="text-amber-500 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
+                        <a id="link-supplies" href="#" target="_blank" class="flex items-center justify-between bg-white dark:bg-black p-4 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm hover:border-amber-500 transition-colors">
+                            <div><span class="block font-bold text-sm md:text-base">Supplies For Candles</span><span class="block text-xs text-body mt-1" id="link-sfc-text">Search...</span></div>
+                            <svg class="text-amber-500 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AROMACHOLOGY & VENN -->
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <!-- Venn -->
+                <div class="glass-panel rounded-[2rem] p-6 sm:p-10 border border-stone-200 dark:border-stone-800 flex flex-col">
+                    <div class="w-full text-center sm:text-left mb-8">
+                        <h2 class="text-2xl font-bold mb-2">Industry Classification</h2>
+                        <p class="text-sm text-body font-medium" id="res-venn-desc">Based on Michael Edwards' Fragrance Wheel.</p>
+                    </div>
+                    <div class="relative flex justify-center items-center h-56 w-full my-auto">
+                        <div class="absolute w-[50%] max-w-[170px] aspect-square rounded-full border-2 border-stone-800/30 bg-stone-800/10 flex items-center justify-center -translate-x-[20%] shadow-lg text-center p-2 z-10" id="venn-left-bg">
+                            <span class="font-bold text-stone-800 dark:text-stone-200 text-xs sm:text-sm pr-4" id="venn-left">Family 1</span>
+                        </div>
+                        <div class="absolute w-[50%] max-w-[170px] aspect-square rounded-full border-2 border-orange-500/30 bg-orange-500/10 flex items-center justify-center translate-x-[20%] shadow-lg text-center p-2 z-10" id="venn-right-bg">
+                            <span class="font-bold text-orange-700 dark:text-orange-400 text-xs sm:text-sm pl-4" id="venn-right">Family 2</span>
+                        </div>
+                        <div class="absolute z-20 w-20 aspect-square rounded-full bg-white dark:bg-stone-900 border-4 border-amber-500 flex items-center justify-center shadow-xl">
+                            <span class="text-[9px] font-black uppercase tracking-widest text-center text-amber-600 leading-tight">Your<br>Profile</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aromachology -->
+                <div class="glass-panel rounded-[2rem] p-6 sm:p-10 border border-stone-200 dark:border-stone-800">
+                    <h2 class="text-2xl font-bold mb-3">Targeted Aromachology</h2>
+                    <p class="text-sm text-body font-medium mb-6">The psychological benefits of your dominant notes.</p>
+                    <div class="space-y-4" id="aroma-cards-container">
+                        <!-- JS Injected -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- MOOD PROFILE -->
+            <section class="glass-panel rounded-[2rem] p-6 sm:p-10 border border-stone-200 dark:border-stone-800">
+                <h2 class="text-2xl font-bold mb-6 text-center">Your Scent Personality Breakdown</h2>
+                <div class="space-y-6 max-w-3xl mx-auto" id="mood-bars-container">
+                    <!-- JS Injected -->
+                </div>
+            </section>
+
+        </div>
+
+        <!-- SHARING FOOTER -->
+        <footer class="text-center pt-12 pb-4 animate-enter stagger-4 mt-8">
+            <div class="bg-stone-200 dark:bg-stone-800 rounded-full py-3 px-6 inline-flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 shadow-sm border border-stone-300 dark:border-stone-700">
+                <div class="flex items-center gap-2 text-stone-900 dark:text-stone-100 font-bold text-sm">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    Share this Application
+                </div>
+                <span class="hidden sm:block text-stone-400">|</span>
+                <p class="text-xs sm:text-sm text-body font-medium">This is a fully self-contained engine. <strong>AirDrop, Email, or Message</strong> this HTML file to anyone to let them build their own profile!</p>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        // --- 1. DATA DICTIONARIES ---
+        const database = [
+            { id: 1, brand: "Aesop", name: "Tacit", top: ["Yuzu", "Basil"], heart: ["Rosemary", "Fennel"], base: ["Vetiver", "Cedar"] },
+            { id: 2, brand: "Aesop", name: "Karst", top: ["Juniper", "Bergamot"], heart: ["Sage", "Cumin"], base: ["Vetiver", "Sandalwood"] },
+            { id: 3, brand: "Aesop", name: "Erémia", top: ["Yuzu", "Grapefruit"], heart: ["Galbanum", "Iris"], base: ["Vetiver", "Patchouli"] },
+            { id: 4, brand: "Aesop", name: "Rōzu", top: ["Rose", "Pink Pepper"], heart: ["Rose", "Guaiacwood"], base: ["Vetiver", "Myrrh"] },
+            { id: 5, brand: "Aesop", name: "Ouranon", top: ["Petitgrain", "Lavender"], heart: ["Hay", "Frankincense"], base: ["Myrrh", "Tonka Bean"] },
+            { id: 6, brand: "Aesop", name: "Eidesis", top: ["Black Pepper"], heart: ["Frankincense", "Cedar"], base: ["Sandalwood", "Vetiver"] },
+            { id: 7, brand: "The White Company", name: "Fireside", top: ["Bergamot", "Lemon"], heart: ["Smoked Woods", "Clove"], base: ["Patchouli", "Amber"] },
+            { id: 8, brand: "The White Company", name: "Pomegranate", top: ["Pomegranate", "Mandarin"], heart: ["Rose", "Jasmine"], base: ["Patchouli", "Amber"] },
+            { id: 9, brand: "The White Company", name: "Seychelles", top: ["Bergamot", "Orange"], heart: ["Coconut", "Jasmine"], base: ["Amber", "Vanilla"] },
+            { id: 10, brand: "The White Company", name: "Love", top: ["Soft Aromatics", "Bergamot"], heart: ["Tonka Bean", "Blond Tobacco"], base: ["Oud", "Amber", "Patchouli"] },
+            { id: 11, brand: "The White Company", name: "Santa Rosa", top: ["Bergamot", "Lemon"], heart: ["Rose", "Violet"], base: ["Sandalwood", "Amber"] },
+            { id: 12, brand: "The White Company", name: "Blanc", top: ["Juniper", "Lemon"], heart: ["White Geranium", "Rose"], base: ["Patchouli", "Musk"] },
+            { id: 13, brand: "The White Company", name: "Amalfi Lemon", top: ["Lemon", "Bergamot"], heart: ["Neroli", "Rosemary"], base: ["Cedarwood", "Musk"] },
+            { id: 14, brand: "The White Company", name: "Glen Isla", top: ["Pine", "Citrus"], heart: ["Oakmoss", "Wild Rose"], base: ["Amber", "Vetiver"] },
+            { id: 15, brand: "H&M Home", name: "Sublime Patchouli", top: ["Bergamot", "Orange"], heart: ["Jasmine", "Nutmeg"], base: ["Patchouli", "Sandalwood"] }
+        ];
+
+        const noteFamilies = {
+            "Oud": "Resinous", "Amber": "Resinous", "Tonka Bean": "Resinous", "Vanilla": "Resinous", "Myrrh": "Resinous", "Frankincense": "Resinous", "Smoked Woods": "Resinous",
+            "Patchouli": "Woody", "Sandalwood": "Woody", "Vetiver": "Woody", "Cedar": "Woody", "Cedarwood": "Woody", "Oakmoss": "Woody", "Moss": "Woody", "Blond Tobacco": "Woody", "Guaiacwood": "Woody", "Pine": "Woody",
+            "Rose": "Floral", "Jasmine": "Floral", "Violet": "Floral", "White Geranium": "Floral", "Geranium": "Floral", "Neroli": "Floral", "Lavender": "Floral", "Iris": "Floral", "Wild Rose": "Floral",
+            "Bergamot": "Fresh", "Lemon": "Fresh", "Mandarin": "Fresh", "Yuzu": "Fresh", "Orange": "Fresh", "Grapefruit": "Fresh", "Juniper": "Fresh", "Rosemary": "Fresh", "Basil": "Fresh", "Citrus": "Fresh"
+        };
+
+        const aromachologyDB = {
+            "Oud": { title: "Oud (Agarwood)", icon: "O", subtitle: "The Spiritual Anchor", text: "Contains compounds that slow brain waves, inducing deep, meditative states of relaxation." },
+            "Tonka Bean": { title: "Tonka Bean & Vanilla", icon: "T", subtitle: "The Emotional Blanket", text: "Rich in coumarin. Sweet notes trigger extreme psychological comfort, evoking feelings of safety and luxurious warmth." },
+            "Amber": { title: "Amber Resins", icon: "A", subtitle: "The Velvet Texture", text: "Provides 'olfactory texture.' It mimics the psychological sensation of being wrapped in a heavy blanket by a fire." },
+            "Patchouli": { title: "Patchouli", icon: "P", subtitle: "The Grounding Force", text: "Significantly reduces subjective anxiety and grounds an overactive nervous system, promoting earthy stability." },
+            "Sandalwood": { title: "Sandalwood", icon: "S", subtitle: "Meditative Alertness", text: "Clinical studies show Sandalwood actively increases alpha-wave generation in the brain, keeping you calm but focused." },
+            "Rose": { title: "Rose & Florals", icon: "R", subtitle: "The Heart Opener", text: "Acts as a profound emotional regulator, promoting serenity, romance, and softening the harsh edges of a stressful day." },
+            "Bergamot": { title: "Bergamot & Citrus", icon: "B", subtitle: "The Mood Elevator", text: "Scientifically proven to lower subjective stress levels while simultaneously boosting energy and providing a clean 'pick-me-up'." },
+            "Vetiver": { title: "Vetiver", icon: "V", subtitle: "The Deep Root", text: "Known as the 'oil of tranquility', it acts as an emotional anchor, pulling scattered energy back to the earth." }
+        };
+
+        // --- 2. STATE & INITIALIZATION ---
+        let selectedIDs = [];
+        let isInitialLoad = true;
+
+        const gridEl = document.getElementById('fragrance-grid');
+        const countEl = document.getElementById('selection-count');
+        const loadingEl = document.getElementById('loading-state');
+        const resultsEl = document.getElementById('results-container');
+        const loadTextEl = document.getElementById('loading-text');
+
+        function renderGrid() {
+            gridEl.innerHTML = '';
+            database.forEach(item => {
+                const isSelected = selectedIDs.includes(item.id);
+                const card = document.createElement('div');
+                card.className = `selectable-card bg-white dark:bg-stone-900 border rounded-xl p-3 sm:p-4 text-center select-none ${isSelected ? 'selected' : 'border-stone-200 dark:border-stone-700'}`;
+                card.onclick = () => toggleSelection(item.id);
+                card.innerHTML = `
+                    <div class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">${item.brand}</div>
+                    <div class="font-bold text-sm sm:text-base ${isSelected ? 'text-amber-600 dark:text-amber-400' : 'text-stone-900 dark:text-stone-100'}">${item.name}</div>
+                    <div class="mt-2 flex justify-center">
+                        <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-amber-500 bg-amber-500 text-white' : 'border-stone-300 dark:border-stone-600'}">
+                            ${isSelected ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+                        </div>
+                    </div>
+                `;
+                gridEl.appendChild(card);
+            });
+            countEl.textContent = selectedIDs.length;
+        }
+
+        function toggleSelection(id) {
+            if (selectedIDs.includes(id)) {
+                selectedIDs = selectedIDs.filter(i => i !== id);
+            } else {
+                if (selectedIDs.length >= 3) {
+                    selectedIDs.shift(); // Remove oldest to allow new
+                }
+                selectedIDs.push(id);
+            }
+            renderGrid();
+            isInitialLoad = false;
+            runEngine(); // Always run, even if 0
+        }
+
+        // --- 3. THE CALCULATION ENGINE ---
+        function runEngine() {
+            resultsEl.classList.add('hidden');
+            loadingEl.classList.remove('hidden');
+            
+            const isAggregate = selectedIDs.length === 0;
+            const texts = isAggregate 
+                ? ["Aggregating all 15 fragrances...", "Cross-referencing global data...", "Calculating Master Blend..."] 
+                : ["Extracting Top Notes...", "Analyzing Heart Accords...", "Cross-referencing Aromachology...", "Calculating Signature Ratio..."];
+            
+            let i = 0;
+            loadTextEl.textContent = texts[0];
+            const interval = setInterval(() => {
+                i++;
+                if (i < texts.length) loadTextEl.textContent = texts[i];
+            }, 300);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                calculateAndRender(isAggregate);
+                loadingEl.classList.add('hidden');
+                resultsEl.classList.remove('hidden');
+                if (!isInitialLoad) {
+                    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, isInitialLoad ? 100 : 1500); // Super fast on initial load, dramatic on click
+        }
+
+        function getFallbackFamily(note) {
+            if(note.includes('Wood') || note.includes('Cedar')) return 'Woody';
+            if(note.includes('Orange') || note.includes('Lemon')) return 'Fresh';
+            if(note.includes('Flower') || note.includes('Jasmine')) return 'Floral';
+            return 'Earthy';
+        }
+
+        function calculateAndRender(isAggregate) {
+            const selected = isAggregate ? database : database.filter(d => selectedIDs.includes(d.id));
+            
+            let allTop = []; let allHeart = []; let allBase = [];
+            selected.forEach(s => {
+                allTop.push(...s.top); allHeart.push(...s.heart); allBase.push(...s.base);
+            });
+
+            // 1. Calculate the Ratio
+            const tCount = allTop.length; const hCount = allHeart.length; const bCount = allBase.length;
+            const total = tCount + hCount + bCount;
+            
+            let tPct = Math.round((tCount / total) * 100);
+            let hPct = Math.round((hCount / total) * 100);
+            let bPct = Math.round((bCount / total) * 100);
+            
+            tPct = Math.max(15, Math.min(30, tPct));
+            bPct = Math.max(35, Math.min(60, bPct));
+            hPct = 100 - tPct - bPct;
+
+            document.getElementById('res-bar-container').innerHTML = `
+                <div class="bg-yellow-400 transition-all duration-1000 w-0" style="width: ${tPct}%" id="anim-top"></div>
+                <div class="bg-orange-500 transition-all duration-1000 w-0" style="width: ${hPct}%" id="anim-heart"></div>
+                <div class="bg-stone-800 dark:bg-stone-300 transition-all duration-1000 w-0" style="width: ${bPct}%" id="anim-base"></div>
+            `;
+            setTimeout(() => {
+                document.getElementById('anim-top').style.width = `${tPct}%`;
+                document.getElementById('anim-heart').style.width = `${hPct}%`;
+                document.getElementById('anim-base').style.width = `${bPct}%`;
+            }, 50);
+
+            document.getElementById('res-top-pct').textContent = `Top (${tPct}%)`;
+            document.getElementById('res-heart-pct').textContent = `Heart (${hPct}%)`;
+            document.getElementById('res-base-pct').textContent = `Base (${bPct}%)`;
+
+            // 2. Dominant Notes
+            const getDominant = (arr) => {
+                let counts = {}; arr.forEach(n => counts[n] = (counts[n] || 0) + 1);
+                return Object.entries(counts).sort((a,b) => b[1] - a[1]).map(e => e[0]).slice(0, 2);
+            };
+            const domTop = getDominant(allTop);
+            const domHeart = getDominant(allHeart);
+            const domBase = getDominant(allBase);
+
+            document.getElementById('res-top-notes').textContent = domTop.join(' & ') || 'Citrus Zest';
+            document.getElementById('res-heart-notes').textContent = domHeart.join(' & ') || 'Soft Florals';
+            document.getElementById('res-base-notes').textContent = domBase.join(' & ') || 'Warm Woods';
+
+            // 3. Naming the Formula
+            if (isAggregate) {
+                document.getElementById('divider-text').textContent = "Aggregate Library Profile";
+                document.getElementById('res-formula-title').textContent = "The Master Aggregate Blend";
+                document.getElementById('res-formula-subtitle').textContent = "Calculated perfectly from all 15 fragrances in the library";
+            } else {
+                document.getElementById('divider-text').textContent = "Your Bespoke Profile";
+                document.getElementById('res-formula-title').textContent = `The "${domBase[0] || 'Amber'} & ${domHeart[0] || 'Rose'}" Formula`;
+                document.getElementById('res-formula-subtitle').textContent = "Mathematically derived from your selections";
+            }
+
+            // 4. Where to buy Links
+            document.getElementById('link-candleshack').href = `https://candleshack.com/search?q=${domBase[0]}+${domHeart[0]}`;
+            document.getElementById('link-cs-text').textContent = `Search: "${domBase[0]}"`;
+            document.getElementById('link-supplies').href = `https://suppliesforcandles.co.uk/search?q=${domHeart[0]}+${domTop[0]}`;
+            document.getElementById('link-sfc-text').textContent = `Search: "${domHeart[0]}"`;
+
+            // 5. Mood Profile (Families)
+            let familyCounts = { "Resinous": 0, "Woody": 0, "Floral": 0, "Fresh": 0 };
+            [...allTop, ...allHeart, ...allBase].forEach(n => {
+                let fam = noteFamilies[n] || getFallbackFamily(n);
+                if(familyCounts[fam] !== undefined) familyCounts[fam]++;
+            });
+            let totalFams = Object.values(familyCounts).reduce((a,b)=>a+b, 0);
+            
+            const colors = { "Resinous": "bg-orange-500", "Woody": "bg-stone-700 dark:bg-stone-500", "Floral": "bg-rose-500", "Fresh": "bg-yellow-400" };
+            const desc = { "Resinous": "Warm, Sweet & Smoky", "Woody": "Earthy & Grounded", "Floral": "Rich & Romantic", "Fresh": "Bright & Zesty" };
+            
+            let sortedFams = Object.entries(familyCounts).sort((a,b)=>b[1]-a[1]);
+            
+            let moodHTML = '';
+            sortedFams.forEach(([fam, count]) => {
+                let p = Math.round((count/totalFams)*100) || 0;
+                moodHTML += `
+                <div>
+                    <div class="flex justify-between text-sm font-bold mb-1"><span class="text-stone-700 dark:text-stone-300">${desc[fam]} (${fam})</span><span>${p}%</span></div>
+                    <div class="h-3 w-full bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden"><div class="h-full ${colors[fam]} rounded-full transition-all duration-1000" style="width: 0%" data-target="${p}%"></div></div>
+                </div>`;
+            });
+            document.getElementById('mood-bars-container').innerHTML = moodHTML;
+            setTimeout(() => {
+                document.querySelectorAll('#mood-bars-container [data-target]').forEach(el => el.style.width = el.dataset.target);
+            }, 50);
+
+            // 6. Classification Venn
+            const fam1 = sortedFams[0][0];
+            const fam2 = sortedFams[1][1] > 0 ? sortedFams[1][0] : sortedFams[0][0];
+            document.getElementById('venn-left').innerHTML = fam1;
+            document.getElementById('venn-right').innerHTML = fam2;
+
+            // Change background ambiance based on dominant family
+            const bg1 = document.getElementById('bg-1'); const bg2 = document.getElementById('bg-2');
+            if(fam1 === 'Floral') { bg1.className = 'absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-rose-500 blur-[100px] transition-colors duration-1000'; bg2.className = 'absolute top-[30%] -right-[10%] w-[50%] h-[70%] rounded-full bg-pink-700 blur-[120px] transition-colors duration-1000'; }
+            else if(fam1 === 'Fresh') { bg1.className = 'absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-yellow-400 blur-[100px] transition-colors duration-1000'; bg2.className = 'absolute top-[30%] -right-[10%] w-[50%] h-[70%] rounded-full bg-emerald-500 blur-[120px] transition-colors duration-1000'; }
+            else if(fam1 === 'Woody') { bg1.className = 'absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-emerald-800 blur-[100px] transition-colors duration-1000'; bg2.className = 'absolute top-[30%] -right-[10%] w-[50%] h-[70%] rounded-full bg-stone-700 blur-[120px] transition-colors duration-1000'; }
+            else if(fam1 === 'Resinous') { bg1.className = 'absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-amber-500 blur-[100px] transition-colors duration-1000'; bg2.className = 'absolute top-[30%] -right-[10%] w-[50%] h-[70%] rounded-full bg-orange-700 blur-[120px] transition-colors duration-1000'; }
+
+            // 7. Aromachology
+            const uniqueNotes = [...new Set([...domBase, ...domHeart, ...domTop])];
+            let renderedCards = 0;
+            let aromaHTML = '';
+            
+            for (let n of uniqueNotes) {
+                let match = Object.keys(aromachologyDB).find(k => n.includes(k) || k.includes(n));
+                if (match && renderedCards < 3) {
+                    let data = aromachologyDB[match];
+                    aromaHTML += `
+                    <div class="flex items-start gap-4 p-4 rounded-2xl bg-white/50 dark:bg-black/30 border border-stone-200 dark:border-stone-800 transform hover:scale-[1.02] transition-transform">
+                        <div class="w-12 h-12 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 flex items-center justify-center shrink-0 font-bold text-xl shadow-inner">${data.icon}</div>
+                        <div>
+                            <h4 class="font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100">${data.title} <span class="block sm:inline text-[10px] uppercase text-body sm:ml-2 mt-1 sm:mt-0 font-bold">${data.subtitle}</span></h4>
+                            <p class="text-xs sm:text-sm text-body mt-2 leading-relaxed">${data.text}</p>
+                        </div>
+                    </div>`;
+                    renderedCards++;
+                }
+            }
+            if (renderedCards === 0) {
+                aromaHTML = `<p class="text-sm text-body italic">Select distinct notes to see clinical aromachology profiles.</p>`;
+            }
+            document.getElementById('aroma-cards-container').innerHTML = aromaHTML;
+        }
+
+        renderGrid();
+        
+        // INITIALIZE APP WITH ALL 15 FRAGRANCES
+        runEngine();
+    </script>
+</body>
+</html>
